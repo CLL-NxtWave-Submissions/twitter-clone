@@ -316,7 +316,7 @@ app.get("/user/tweets/feed", async (req, res) => {
           WHERE
             tweet.user_id IN (${followingUserIdsString})
           ORDER BY
-            tweet.date_time
+            tweet.date_time DESC
           LIMIT 4;
           `;
 
@@ -336,5 +336,17 @@ app.get("/user/tweets/feed", async (req, res) => {
     );
   }
 });
+
+/*
+    End-Point 4  : GET /user/following
+    Header Name  : Authorization
+    Header Value : Bearer JSON_WEB_TOKEN
+    --------------
+    To fetch names of uses that the logged
+    in user is following, with appropriate
+    checks in place to check for 
+    authorization through JSON Web Token
+*/
+app.get("/user/following", async (req, res) => {});
 
 module.exports = app;
