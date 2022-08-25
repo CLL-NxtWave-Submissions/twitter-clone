@@ -9,6 +9,7 @@ const app = express();
 app.use(express.json());
 
 const SALT_ROUNDS_FOR_PASSWORD_HASHING = 10;
+const AUTHORIZATION_SECRET_FOR_JWT = "AUTHORIZATION_KEY";
 
 const twitterCloneDatabaseFilePath = path.join(__dirname, "twitterClone.db");
 const sqliteDriver = sqlite3.Database;
@@ -35,6 +36,43 @@ const initializeDBAndServer = async () => {
 initializeDBAndServer();
 
 /*
+    Function Name   : isExistingUser
+    Input Parameter : inputUsername
+    Return Value    : Boolean true for existing user
+                      and false otherwise
+    -------------------------------------------------
+    Description: Function to check if a user exists
+                 with the given username.
+*/
+const isExistingUser = async (inputUsername) => {
+  let existingUserCheckResult = {
+    userExists: true,
+    existingUserData: {},
+  };
+
+  const queryToFetchExistingUserData = `
+    SELECT
+        *
+    FROM
+        user
+    WHERE
+        username = '${inputUsername}';
+    `;
+
+  const existingUserDataFromDB = await twitterCloneDBConnectionObj.get(
+    queryToFetchExistingUserData
+  );
+
+  if (existingUserDataFromDB !== undefined) {
+    existingUserCheckResult.existingUserData = existingUserDataFromDB;
+  } else {
+    existingUserCheckResult.userExists = false;
+  }
+
+  return existingUserCheckResult;
+};
+
+/*
     Function Name   : validateUsername
     Input Parameter : inputUsername
     Return Value    : Validation Result Object
@@ -52,19 +90,8 @@ const validateUsername = async (inputUsername) => {
     failedMsg: "",
   };
 
-  const queryToFetchExistingUserData = `
-    SELECT
-        *
-    FROM
-        user
-    WHERE
-        username = '${inputUsername}';
-    `;
-
-  const existingUserData = await twitterCloneDBConnectionObj.get(
-    queryToFetchExistingUserData
-  );
-  if (existingUserData !== undefined) {
+  const userCheckResult = await isExistingUser(inputUsername);
+  if (userCheckResult.userExists) {
     validationResult.isNewUser = false;
     validationResult.failedMsg = "User already exists";
   }
@@ -96,6 +123,51 @@ const validatePassword = (inputPassword) => {
   }
 
   return validationResult;
+};
+
+/*
+    Function Name         : verifyLoginPassword
+    Input Parameters      :
+        - inputUsername   : Input username to fetch
+                            existing user data
+        - inputPassword   : Input password to compare
+                            with hashed password stored
+                            in the database for existing
+                            user
+    Return Value          : Validation Result Object
+        - isValidPassword : Boolean true for valid
+                            password and false otherwise
+        - failedMsg       : Failed validation message
+    -----------------------------------------------------
+    Description: Function to validate input
+                 password and accordingly
+                 return the result in an object.
+*/
+const verifyLoginCredentials = async (inputUsername, inputPassword) => {
+  const loginCredentialsCheckResult = {
+    isUsernameValid: true,
+    isPasswordValid: true,
+  };
+
+  const userCheckResult = await isExistingUser(inputUsername);
+  if (!userCheckResult.userExists) {
+    loginCredentialsCheckResult.isUsernameValid = false;
+    loginCredentialsCheckResult.isPasswordValid = false;
+  } else {
+    // valid username
+    const userDataFromDB = userCheckResult.existingUserData;
+    const hashedPassword = userDataFromDB.password;
+
+    let isMatchingPassword = await bcrypt.compare(
+      inputPassword,
+      hashedPassword
+    );
+    if (!isMatchingPassword) {
+      loginCredentialsCheckResult.isPasswordValid = false;
+    }
+  }
+
+  return loginCredentialsCheckResult;
 };
 
 /*
@@ -141,6 +213,37 @@ app.post("/register", async (req, res) => {
       res.send("User created successfully");
     } // End of else-part of inner if-statement with condition: (!passwordValidationResult.isValidPassword)
   } // End of else-part of outer if-statement with condition: (!usernameValidationResult.isNewUser)
+});
+
+/*
+    End-Point 2: POST /login
+    ------------
+    To login a user based on 
+    input credentials, after
+    verification of the same
+*/
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  const loginCredentialsCheckResult = await verifyLoginCredentials(
+    username,
+    password
+  );
+  if (!loginCredentialsCheckResult.isUsernameValid) {
+    res.status(400);
+    res.send("Invalid user");
+  } else if (!loginCredentialsCheckResult.isPasswordValid) {
+    res.status(400);
+    res.send("Invalid password");
+  } else {
+    // login success !
+    const userIdentifiablePayload = { username };
+    const jwtToken = jwt.sign(
+      userIdentifiablePayload,
+      AUTHORIZATION_SECRET_FOR_JWT
+    );
+    res.send({ jwtToken });
+  }
 });
 
 module.exports = app;
