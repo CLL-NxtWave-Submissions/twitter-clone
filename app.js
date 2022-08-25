@@ -246,4 +246,95 @@ app.post("/login", async (req, res) => {
   }
 });
 
+/*
+    End-Point 3  : GET /user/tweets/feed
+    Header Name  : Authorization
+    Header Value : Bearer JSON_WEB_TOKEN
+    --------------
+    To fetch latest 4 tweets posted by
+    users followed by the logged in user
+
+*/
+app.get("/user/tweets/feed", async (req, res) => {
+  const authorizationHeaderValue = req.headers.authorization;
+  if (authorizationHeaderValue === undefined) {
+    res.status(401);
+    res.send("Invalid JWT Token");
+  } else {
+    const jsonWebTokenFromAuthHeader = authorizationHeaderValue.split(" ")[1];
+    jwt.verify(
+      jsonWebTokenFromAuthHeader,
+      AUTHORIZATION_SECRET_FOR_JWT,
+      async (verificationError, userIdentifiablePayload) => {
+        if (verificationError) {
+          res.status(401);
+          res.send("Invalid JWT Token");
+        } else {
+          const { username } = userIdentifiablePayload;
+          const queryToFetchLoggedInUserDetails = `
+                SELECT *
+                FROM user
+                WHERE username = '${username}';
+                `;
+
+          const loggedInUserDetails = await twitterCloneDBConnectionObj.get(
+            queryToFetchLoggedInUserDetails
+          );
+          const { user_id } = loggedInUserDetails;
+
+          const queryToFetchFollowingUserIDs = `
+                SELECT
+                    following_user_id
+                FROM
+                    follower
+                WHERE
+                    follower_user_id = ${user_id};
+                `;
+
+          const listOfFollowingUserIdObjects = await twitterCloneDBConnectionObj.all(
+            queryToFetchFollowingUserIDs
+          );
+
+          const listOfFollowingUserIds = listOfFollowingUserIdObjects.map(
+            (currentFollowingUserIdObject) =>
+              currentFollowingUserIdObject.following_user_id.toString()
+          );
+
+          const followingUserIdsString = listOfFollowingUserIds.join(", ");
+
+          const queryToFetchLatest4TweetsFromFollowingUserIds = `
+          SELECT
+            user.username AS username,
+            tweet.tweet AS tweet,
+            tweet.date_time AS date_time
+          FROM 
+            tweet
+          INNER JOIN 
+            user
+          ON
+            tweet.user_id = user.user_id
+          WHERE
+            tweet.user_id IN (${followingUserIdsString})
+          ORDER BY
+            tweet.date_time
+          LIMIT 4;
+          `;
+
+          const latest4TweetsFromFollowingUserIds = await twitterCloneDBConnectionObj.all(
+            queryToFetchLatest4TweetsFromFollowingUserIds
+          );
+          const processedLatest4TweetsFromFollowingUserIds = latest4TweetsFromFollowingUserIds.map(
+            (currentTweet) => ({
+              username: currentTweet.username,
+              tweet: currentTweet.tweet,
+              dateTime: currentTweet.date_time,
+            })
+          );
+          res.send(processedLatest4TweetsFromFollowingUserIds);
+        }
+      }
+    );
+  }
+});
+
 module.exports = app;
