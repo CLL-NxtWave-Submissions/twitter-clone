@@ -1,0 +1,10 @@
+POST /register
+
+{
+  "username": "JoeBiden",
+  "password": "richard_567",
+  "name": "Adam Richard",
+  "gender": "male"
+}
+
+###
