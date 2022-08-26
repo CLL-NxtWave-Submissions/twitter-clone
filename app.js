@@ -36,6 +36,46 @@ const initializeDBAndServer = async () => {
 initializeDBAndServer();
 
 /*
+    Function Name : checkUserRequestAuthorization
+    Function Type : Middleware
+    ----------------------------------------------
+    Middleware function with logic to check user
+    authorization based on the available JSON Web 
+    Token value in the request header
+*/
+const checkUserRequestAuthorization = async (req, res, next) => {
+  const authorizationHeaderValue = req.headers.authorization;
+  if (authorizationHeaderValue === undefined) {
+    // No authorization header has been
+    // passed in the http request
+    res.status(401);
+    res.send("Invalid JWT Token");
+  } else {
+    const jsonWebTokenFromRequestHeader = authorizationHeaderValue.split(
+      " "
+    )[1];
+    await jwt.verify(
+      jsonWebTokenFromRequestHeader,
+      AUTHORIZATION_SECRET_FOR_JWT,
+      (verificationError, userIdentifiablePayload) => {
+        if (verificationError) {
+          // Incorrect JSON Web Token
+          res.status(401);
+          res.send("Invalid JWT Token");
+        } else {
+          // Authorization Check Pass !
+          const { username } = userIdentifiablePayload;
+          req.username = username;
+          next(); // Gives execution control to the next middleware
+          // or handler method of the HTTP request method
+          // that invoked this middleware.
+        }
+      }
+    );
+  }
+};
+
+/*
     Function Name   : isExistingUser
     Input Parameter : inputUsername
     Return Value    : Boolean true for existing user
@@ -255,34 +295,26 @@ app.post("/login", async (req, res) => {
     users followed by the logged in user
 
 */
-app.get("/user/tweets/feed", async (req, res) => {
-  const authorizationHeaderValue = req.headers.authorization;
-  if (authorizationHeaderValue === undefined) {
-    res.status(401);
-    res.send("Invalid JWT Token");
-  } else {
-    const jsonWebTokenFromAuthHeader = authorizationHeaderValue.split(" ")[1];
-    jwt.verify(
-      jsonWebTokenFromAuthHeader,
-      AUTHORIZATION_SECRET_FOR_JWT,
-      async (verificationError, userIdentifiablePayload) => {
-        if (verificationError) {
-          res.status(401);
-          res.send("Invalid JWT Token");
-        } else {
-          const { username } = userIdentifiablePayload;
-          const queryToFetchLoggedInUserDetails = `
+app.get(
+  "/user/tweets/feed",
+  checkUserRequestAuthorization,
+  async (req, res) => {
+    const { username } = req; // username property
+    // added by checkUserRequestAuthorization
+    // middleware to req object.
+
+    const queryToFetchLoggedInUserDetails = `
                 SELECT *
                 FROM user
                 WHERE username = '${username}';
                 `;
 
-          const loggedInUserDetails = await twitterCloneDBConnectionObj.get(
-            queryToFetchLoggedInUserDetails
-          );
-          const { user_id } = loggedInUserDetails;
+    const loggedInUserDetails = await twitterCloneDBConnectionObj.get(
+      queryToFetchLoggedInUserDetails
+    );
+    const { user_id } = loggedInUserDetails;
 
-          const queryToFetchFollowingUserIDs = `
+    const queryToFetchFollowingUserIDs = `
                 SELECT
                     following_user_id
                 FROM
@@ -291,18 +323,18 @@ app.get("/user/tweets/feed", async (req, res) => {
                     follower_user_id = ${user_id};
                 `;
 
-          const listOfFollowingUserIdObjects = await twitterCloneDBConnectionObj.all(
-            queryToFetchFollowingUserIDs
-          );
+    const listOfFollowingUserIdObjects = await twitterCloneDBConnectionObj.all(
+      queryToFetchFollowingUserIDs
+    );
 
-          const listOfFollowingUserIds = listOfFollowingUserIdObjects.map(
-            (currentFollowingUserIdObject) =>
-              currentFollowingUserIdObject.following_user_id.toString()
-          );
+    const listOfFollowingUserIds = listOfFollowingUserIdObjects.map(
+      (currentFollowingUserIdObject) =>
+        currentFollowingUserIdObject.following_user_id.toString()
+    );
 
-          const followingUserIdsString = listOfFollowingUserIds.join(", ");
+    const followingUserIdsString = listOfFollowingUserIds.join(", ");
 
-          const queryToFetchLatest4TweetsFromFollowingUserIds = `
+    const queryToFetchLatest4TweetsFromFollowingUserIds = `
           SELECT
             user.username AS username,
             tweet.tweet AS tweet,
@@ -320,22 +352,19 @@ app.get("/user/tweets/feed", async (req, res) => {
           LIMIT 4;
           `;
 
-          const latest4TweetsFromFollowingUserIds = await twitterCloneDBConnectionObj.all(
-            queryToFetchLatest4TweetsFromFollowingUserIds
-          );
-          const processedLatest4TweetsFromFollowingUserIds = latest4TweetsFromFollowingUserIds.map(
-            (currentTweet) => ({
-              username: currentTweet.username,
-              tweet: currentTweet.tweet,
-              dateTime: currentTweet.date_time,
-            })
-          );
-          res.send(processedLatest4TweetsFromFollowingUserIds);
-        }
-      }
+    const latest4TweetsFromFollowingUserIds = await twitterCloneDBConnectionObj.all(
+      queryToFetchLatest4TweetsFromFollowingUserIds
     );
+    const processedLatest4TweetsFromFollowingUserIds = latest4TweetsFromFollowingUserIds.map(
+      (currentTweet) => ({
+        username: currentTweet.username,
+        tweet: currentTweet.tweet,
+        dateTime: currentTweet.date_time,
+      })
+    );
+    res.send(processedLatest4TweetsFromFollowingUserIds);
   }
-});
+);
 
 /*
     End-Point 4  : GET /user/following
