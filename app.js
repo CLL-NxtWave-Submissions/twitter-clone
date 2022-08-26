@@ -660,17 +660,27 @@ app.get(
   tweet to have been posted by a user, that
   the logged in user follows.  
 */
-app.get("/tweets/:tweetId/likes", checkUserRequestAuthorization, isTweetPostedByAFollowingUser, async (req, res) => {
+app.get(
+  "/tweets/:tweetId/likes",
+  checkUserRequestAuthorization,
+  isTweetPostedByAFollowingUser,
+  async (req, res) => {
     const { requestedTweetData } = req; // requestedTweetData added by middleware: isTweetPostedByAFollowingUser
     const tweetId = requestedTweetData.tweet_id;
 
-    const likesDataOfRequestedTweet = await getLikesDataOfSpecificTweet(tweetId);
+    const likesDataOfRequestedTweet = await getLikesDataOfSpecificTweet(
+      tweetId
+    );
 
-    // Extract user_id's as strings and 
+    // Extract user_id's as strings and
     // combine all into a string to be
     // used in the following query.
-    const listOfUserIdsAsStringsFromTweetLikesData = likesDataOfRequestedTweet.map((currentLikeData) => currentLikeData.user_id.toString());
-    const stringOfAllUserIds = listOfUserIdsAsStringsFromTweetLikesData.join(", ");
+    const listOfUserIdsAsStringsFromTweetLikesData = likesDataOfRequestedTweet.map(
+      (currentLikeData) => currentLikeData.user_id.toString()
+    );
+    const stringOfAllUserIds = listOfUserIdsAsStringsFromTweetLikesData.join(
+      ", "
+    );
 
     const queryToFetchUsernamesOfUsersThatLikedRequestedTweet = `
     SELECT
@@ -681,14 +691,78 @@ app.get("/tweets/:tweetId/likes", checkUserRequestAuthorization, isTweetPostedBy
         user_id IN (${stringOfAllUserIds});
     `;
 
-    const listOfUsernameObjects = await twitterCloneDBConnectionObj.all(queryToFetchUsernamesOfUsersThatLikedRequestedTweet);
-    const listOfUsernames = listOfUsernameObjects.map((currentUsernameObj) => currentUsernameObj.username);
-    
+    const listOfUsernameObjects = await twitterCloneDBConnectionObj.all(
+      queryToFetchUsernamesOfUsersThatLikedRequestedTweet
+    );
+    const listOfUsernames = listOfUsernameObjects.map(
+      (currentUsernameObj) => currentUsernameObj.username
+    );
+
     const requestedLikesData = {
-        likes: listOfUsernames
+      likes: listOfUsernames,
     };
 
     res.send(requestedLikesData);
-});
+  }
+);
+
+/*
+  End-Point 8  : GET /tweets/:tweetId/replies
+  Header Name  : Authorization
+  Header Value : Bearer JSON_WEB_TOKEN
+  --------------
+  To fetch the list of replies for a specific
+  tweet with id: tweetId, after ensuring the
+  requested tweet is posted by a user that
+  the logged in user follows. 
+*/
+app.get(
+  "/tweets/:tweetId/replies",
+  checkUserRequestAuthorization,
+  isTweetPostedByAFollowingUser,
+  async (req, res) => {
+    const { requestedTweetData } = req;
+    const tweetId = requestedTweetData.tweet_id;
+
+    const repliesDataOfRequestedTweet = await getRepliesDataOfSpecificTweet(
+      tweetId
+    );
+
+    // Extract user ids from the replies data
+    // as strings and combine them all into a
+    // single string to be used in the following
+    // query.
+    const listOfUserIdStringsThatRepliedToRequestedTweet = repliesDataOfRequestedTweet.map(
+      (currentReplyData) => currentReplyData.user_id.toString()
+    );
+    const stringOfAllUserIds = listOfUserIdStringsThatRepliedToRequestedTweet.join(
+      ", "
+    );
+
+    const queryToFetchNameOfUserAndReplyTextForAllReplies = `
+    SELECT
+        user.name AS name,
+        reply.reply AS reply
+    FROM
+        reply
+        INNER JOIN user
+        ON reply.user_id = user.user_id
+    WHERE
+        reply.user_id IN (${stringOfAllUserIds})
+        AND
+        reply.tweet_id = ${tweetId};
+    `;
+
+    const listOfNameOfUserAndReplyTextDataObjects = await twitterCloneDBConnectionObj.all(
+      queryToFetchNameOfUserAndReplyTextForAllReplies
+    );
+
+    const requestedRepliesData = {
+      replies: listOfNameOfUserAndReplyTextDataObjects,
+    };
+
+    res.send(requestedRepliesData);
+  }
+);
 
 module.exports = app;
