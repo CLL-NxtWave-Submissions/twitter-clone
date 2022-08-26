@@ -326,6 +326,58 @@ const verifyLoginCredentials = async (inputUsername, inputPassword) => {
 };
 
 /*
+    Function Name           : getLikesDataOfSpecificTweet
+    Input Parameters        :
+        - specificTweetId   : Id of the requested tweet
+                              data
+    Return Value            : List of "like" data objects
+    -----------------------------------------------------
+    Description: Function to fetch list of tweet-like 
+                 data objects from the "like" table.
+*/
+const getLikesDataOfSpecificTweet = async (requestedTweetId) => {
+  const queryToFetchLikeDataOfSpecificTweet = `
+    SELECT
+        *
+    FROM
+        like
+    WHERE
+        tweet_id = ${requestedTweetId};
+    `;
+
+  const likesDataFOrSpecificTweet = await twitterCloneDBConnectionObj.all(
+    queryToFetchLikeDataOfSpecificTweet
+  );
+  return likesDataFOrSpecificTweet;
+};
+
+/*
+    Function Name           : getRepliesDataOfSpecificTweet
+    Input Parameters        :
+        - specificTweetId   : Id of the requested tweet
+                              data
+    Return Value            : List of "reply" data objects
+    -----------------------------------------------------
+    Description: Function to fetch list of tweet-reply 
+                 data objects from the "reply" table.
+*/
+const getRepliesDataOfSpecificTweet = async (requestedTweetId) => {
+  const queryToFetchReplyDataOfSpecificTweet = `
+    SELECT
+        *
+    FROM
+        reply
+    WHERE
+        tweet_id = ${requestedTweetId};
+    `;
+
+  const repliesDataFOrSpecificTweet = await twitterCloneDBConnectionObj.all(
+    queryToFetchReplyDataOfSpecificTweet
+  );
+  return repliesDataFOrSpecificTweet;
+};
+
+/*
     End-Point 1: POST /register
     ------------
     To register/add new user
@@ -574,6 +626,7 @@ app.get(
   isTweetPostedByAFollowingUser,
   async (req, res) => {
     const { requestedTweetData } = req;
+
     res.send(requestedTweetData);
   }
 );
