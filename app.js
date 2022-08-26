@@ -626,8 +626,26 @@ app.get(
   isTweetPostedByAFollowingUser,
   async (req, res) => {
     const { requestedTweetData } = req;
+    const { tweet_id } = requestedTweetData;
 
-    res.send(requestedTweetData);
+    const likesDataOfRequestedTweet = await getLikesDataOfSpecificTweet(
+      tweet_id
+    );
+    const repliesDataOfRequestedTweet = await getRepliesDataOfSpecificTweet(
+      tweet_id
+    );
+
+    const numberOfLikes = likesDataOfRequestedTweet.length;
+    const numberOfReplies = repliesDataOfRequestedTweet.length;
+
+    const requestedTweetAndRelatedData = {
+      tweet: requestedTweetData.tweet,
+      likes: numberOfLikes,
+      replies: numberOfReplies,
+      dateTime: requestedTweetData.date_time,
+    };
+
+    res.send(requestedTweetAndRelatedData);
   }
 );
 
