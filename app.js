@@ -649,4 +649,46 @@ app.get(
   }
 );
 
+/*
+  End-Point 7  : GET /tweets/:tweetId/likes
+  Header Name  : Authorization
+  Header Value : Bearer JSON_WEB_TOKEN
+  --------------
+  To fetch the list of usernames of users
+  that like the tweet with id: tweetId,
+  after the verification on the requested
+  tweet to have been posted by a user, that
+  the logged in user follows.  
+*/
+app.get("/tweets/:tweetId/likes", checkUserRequestAuthorization, isTweetPostedByAFollowingUser, async (req, res) => {
+    const { requestedTweetData } = req; // requestedTweetData added by middleware: isTweetPostedByAFollowingUser
+    const tweetId = requestedTweetData.tweet_id;
+
+    const likesDataOfRequestedTweet = await getLikesDataOfSpecificTweet(tweetId);
+
+    // Extract user_id's as strings and 
+    // combine all into a string to be
+    // used in the following query.
+    const listOfUserIdsAsStringsFromTweetLikesData = likesDataOfRequestedTweet.map((currentLikeData) => currentLikeData.user_id.toString());
+    const stringOfAllUserIds = listOfUserIdsAsStringsFromTweetLikesData.join(", ");
+
+    const queryToFetchUsernamesOfUsersThatLikedRequestedTweet = `
+    SELECT
+        user.username AS username
+    FROM
+        user
+    WHERE
+        user_id IN (${stringOfAllUserIds});
+    `;
+
+    const listOfUsernameObjects = await twitterCloneDBConnectionObj.all(queryToFetchUsernamesOfUsersThatLikedRequestedTweet);
+    const listOfUsernames = listOfUsernameObjects.map((currentUsernameObj) => currentUsernameObj.username);
+    
+    const requestedLikesData = {
+        likes: listOfUsernames
+    };
+
+    res.send(requestedLikesData);
+});
+
 module.exports = app;
