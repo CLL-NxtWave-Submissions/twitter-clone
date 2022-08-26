@@ -36,6 +36,61 @@ const initializeDBAndServer = async () => {
 initializeDBAndServer();
 
 /*
+    Function Name : isTweetPostedByAFollowingUser
+    Function Type : Middleware
+    ----------------------------------------------------
+    Middleware function to check if the input 
+    tweet id maps to a tweet posted by one of the
+    users that the logged in user follows. Invoked
+    by another middleware: checkUserRequestAuthorization.
+    Adds new property to the req object: requestedTweetData
+    if the requested tweet is indeed posted by a user
+    followed by logged in user. Gives control to the intended
+    request handler upon the call to "next".          
+*/
+const isTweetPostedByAFollowingUser = async (req, res, next) => {
+  const { username } = req;
+  const { tweetId } = req.params;
+
+  const listOfFollowingUserIdObjects = await getListOfFollowingUserIdObjectsForSpecificUser(
+    username
+  );
+
+  // Extract user ids from the objects as strings
+  // and combine all into a single string to be used
+  // in the following query
+  const listOfFollowingUserIdsAsStrings = listOfFollowingUserIdObjects.map(
+    (currentUserIdObj) => currentUserIdObj.following_user_id.toString()
+  );
+  const stringOfAllFollowingUserIds = listOfFollowingUserIdsAsStrings.join(
+    ", "
+  );
+
+  const queryToGetSpecificTweetData = `
+    SELECT
+        *
+    FROM
+        tweet
+    WHERE
+        tweet_id = ${tweetId}
+        AND
+        user_id IN (${stringOfAllFollowingUserIds});
+    `;
+
+  const specificTweetData = await twitterCloneDBConnectionObj.get(
+    queryToGetSpecificTweetData
+  );
+  if (specificTweetData === undefined) {
+    res.status(401);
+    res.send("Invalid Request");
+  } else {
+    // Tweet posted by a following user
+    req.requestedTweetData = specificTweetData;
+    next();
+  }
+};
+
+/*
     Function Name : checkUserRequestAuthorization
     Function Type : Middleware
     ----------------------------------------------
@@ -502,5 +557,25 @@ app.get("/user/followers", checkUserRequestAuthorization, async (req, res) => {
   );
   res.send(listOfNameObjectsOfAllFollowerUserIds);
 });
+
+/*
+    End-Point 6  : GET /tweets/:tweetId
+    Header Name  : Authorization
+    Header Value : Bearer JSON_WEB_TOKEN 
+    --------------
+    To fetch tweet data like tweet text,
+    likes, replies, with id: tweetId,
+    only if it was posted by users being
+    followed by logged in user.
+*/
+app.get(
+  "/tweets/:tweetId",
+  checkUserRequestAuthorization,
+  isTweetPostedByAFollowingUser,
+  async (req, res) => {
+    const { requestedTweetData } = req;
+    res.send(requestedTweetData);
+  }
+);
 
 module.exports = app;
