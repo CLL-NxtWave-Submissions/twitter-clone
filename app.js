@@ -76,6 +76,36 @@ const checkUserRequestAuthorization = async (req, res, next) => {
 };
 
 /*
+    Function Name          : getSpecificUserDetailsFromDB
+    Input Parameter        :
+        - specificUsername : Username of specific user
+    Return Value           : Object with details of specific
+                             user
+    -------------------------------------------------------
+    Description: Arrow function to fetch user details from
+                 user table in the twitter clone database,
+                 matching the input username. Need to make
+                 caller method async as well to use await
+                 keyword with this function's call, as this
+                 function is also async.                        
+*/
+const getSpecificUserDetailsFromDB = async (specificUsername) => {
+  const queryToGetSpecificUserDetails = `
+    SELECT
+        *
+    FROM
+        user
+    WHERE
+        username = '${specificUsername}';
+    `;
+
+  const specificUserDetails = await twitterCloneDBConnectionObj.get(
+    queryToGetSpecificUserDetails
+  );
+  return specificUserDetails;
+};
+
+/*
     Function Name   : isExistingUser
     Input Parameter : inputUsername
     Return Value    : Boolean true for existing user
@@ -90,17 +120,8 @@ const isExistingUser = async (inputUsername) => {
     existingUserData: {},
   };
 
-  const queryToFetchExistingUserData = `
-    SELECT
-        *
-    FROM
-        user
-    WHERE
-        username = '${inputUsername}';
-    `;
-
-  const existingUserDataFromDB = await twitterCloneDBConnectionObj.get(
-    queryToFetchExistingUserData
+  const existingUserDataFromDB = await getSpecificUserDetailsFromDB(
+    inputUsername
   );
 
   if (existingUserDataFromDB !== undefined) {
@@ -303,15 +324,7 @@ app.get(
     // added by checkUserRequestAuthorization
     // middleware to req object.
 
-    const queryToFetchLoggedInUserDetails = `
-                SELECT *
-                FROM user
-                WHERE username = '${username}';
-                `;
-
-    const loggedInUserDetails = await twitterCloneDBConnectionObj.get(
-      queryToFetchLoggedInUserDetails
-    );
+    const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
     const { user_id } = loggedInUserDetails;
 
     const queryToFetchFollowingUserIDs = `
@@ -376,6 +389,9 @@ app.get(
     checks in place to check for 
     authorization through JSON Web Token
 */
-app.get("/user/following", async (req, res) => {});
+app.get("/user/following", checkUserRequestAuthorization, async (req, res) => {
+  const { username } = req;
+  const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
+});
 
 module.exports = app;
