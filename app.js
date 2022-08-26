@@ -436,25 +436,35 @@ app.get("/user/following", checkUserRequestAuthorization, async (req, res) => {
   // to extract corresponding usernames.
   const stringOfFollowingUserIds = listOfFollowingUserIds.join(",");
 
-  const queryToFetchCorrespondingUsernamesOfAllFollowingUserIds = `
+  const queryToFetchCorrespondingNamesOfAllFollowingUserIds = `
   SELECT
-    username
+    name
   FROM
     user
   WHERE
     user_id IN (${stringOfFollowingUserIds});
   `;
 
-  const listOfUsernameObjectsForFollowingUserIds = await twitterCloneDBConnectionObj.all(
-    queryToFetchCorrespondingUsernamesOfAllFollowingUserIds
+  const listOfNameObjectsForFollowingUserIds = await twitterCloneDBConnectionObj.all(
+    queryToFetchCorrespondingNamesOfAllFollowingUserIds
   );
 
-  const processedListOfUsernameObjectsForFollowingUserIds = listOfUsernameObjectsForFollowingUserIds.map(
-    (currentUsernameObj) => ({
-      user: currentUsernameObj.username,
-    })
-  );
-  res.send(processedListOfUsernameObjectsForFollowingUserIds);
+  res.send(listOfNameObjectsForFollowingUserIds);
+});
+
+/*
+    End-Point 5  : GET /user/followers
+    Header Name  : Authorization
+    Header Value : Bearer JSON_WEB_TOKEN
+    ------------------------------------
+    To fetch list of usernames of users
+    that follow the logged in user 
+*/
+app.get("/user/followers", checkUserRequestAuthorization, async (req, res) => {
+  const { username } = req;
+  const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
+
+  //   const queryToGet;
 });
 
 module.exports = app;
