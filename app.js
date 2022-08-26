@@ -462,9 +462,45 @@ app.get("/user/following", checkUserRequestAuthorization, async (req, res) => {
 */
 app.get("/user/followers", checkUserRequestAuthorization, async (req, res) => {
   const { username } = req;
-  const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
 
-  //   const queryToGet;
+  const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
+  const { user_id } = loggedInUserDetails;
+
+  const queryToFetchListOfFollowerUserIdObjectsForLoggedInUser = `
+    SELECT
+        follower_user_id
+    FROM
+        follower
+    WHERE
+        following_user_id = ${user_id};
+    `;
+
+  const listOfFollowerUserIdObjects = await twitterCloneDBConnectionObj.all(
+    queryToFetchListOfFollowerUserIdObjectsForLoggedInUser
+  );
+
+  // Get list of follower_user_id's as strings
+  // to be joined into a single string and used
+  // in the following query to fetch list of names
+  // of follower_user_id's
+  const listOfFollowerUserIdsAsStrings = listOfFollowerUserIdObjects.map(
+    (currentUserId) => currentUserId.follower_user_id.toString()
+  );
+  const stringOfFollowerUserIds = listOfFollowerUserIdsAsStrings.join(",");
+
+  const queryToFetchListOfNameObjectsOfAllFollowerUserIds = `
+    SELECT
+        name
+    FROM
+        user
+    WHERE
+        user_id IN (${stringOfFollowerUserIds});
+    `;
+
+  const listOfNameObjectsOfAllFollowerUserIds = await twitterCloneDBConnectionObj.all(
+    queryToFetchListOfNameObjectsOfAllFollowerUserIds
+  );
+  res.send(listOfNameObjectsOfAllFollowerUserIds);
 });
 
 module.exports = app;
