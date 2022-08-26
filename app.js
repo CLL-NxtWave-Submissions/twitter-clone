@@ -106,6 +106,45 @@ const getSpecificUserDetailsFromDB = async (specificUsername) => {
 };
 
 /*
+    Function Name          : getListOfFollowingUserIdObjectsForSpecificUser
+    Input Parameter        :
+        - specificUsername : Username of specific user
+    Return Value           : List of following user id objects
+                             being followed by specific
+                             user with the input username
+    ------------------------------------------------------------------------
+    Description: Arrow function to fetch list of following
+                 user ids from follower table in the twitter
+                 clone database,specific to the input username.
+                 Need to make caller method async as well to use
+                 await keyword with this function's call, as this
+                 function is also async.                        
+*/
+const getListOfFollowingUserIdObjectsForSpecificUser = async (
+  specificUsername
+) => {
+  const specificUserDetails = await getSpecificUserDetailsFromDB(
+    specificUsername
+  );
+  const { user_id } = specificUserDetails;
+
+  const queryToFetchFollowingUserIDs = `
+                SELECT
+                    following_user_id
+                FROM
+                    follower
+                WHERE
+                    follower_user_id = ${user_id};
+                `;
+
+  const listOfFollowingUserIdObjects = await twitterCloneDBConnectionObj.all(
+    queryToFetchFollowingUserIDs
+  );
+
+  return listOfFollowingUserIdObjects;
+};
+
+/*
     Function Name   : isExistingUser
     Input Parameter : inputUsername
     Return Value    : Boolean true for existing user
@@ -324,20 +363,8 @@ app.get(
     // added by checkUserRequestAuthorization
     // middleware to req object.
 
-    const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
-    const { user_id } = loggedInUserDetails;
-
-    const queryToFetchFollowingUserIDs = `
-                SELECT
-                    following_user_id
-                FROM
-                    follower
-                WHERE
-                    follower_user_id = ${user_id};
-                `;
-
-    const listOfFollowingUserIdObjects = await twitterCloneDBConnectionObj.all(
-      queryToFetchFollowingUserIDs
+    const listOfFollowingUserIdObjects = await getListOfFollowingUserIdObjectsForSpecificUser(
+      username
     );
 
     const listOfFollowingUserIds = listOfFollowingUserIdObjects.map(
@@ -391,7 +418,43 @@ app.get(
 */
 app.get("/user/following", checkUserRequestAuthorization, async (req, res) => {
   const { username } = req;
-  const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
+
+  const listOfFollowingUserIdObjects = await getListOfFollowingUserIdObjectsForSpecificUser(
+    username
+  );
+
+  // Extract just the following_user_id's as
+  // strings into an array.
+  const listOfFollowingUserIds = listOfFollowingUserIdObjects.map(
+    (currentFollowingUserIdObject) =>
+      currentFollowingUserIdObject.following_user_id.toString()
+  );
+
+  // Combine all following_user_id's into a single
+  // string, in order to be embedded into the
+  // following query string literal WHERE clause,
+  // to extract corresponding usernames.
+  const stringOfFollowingUserIds = listOfFollowingUserIds.join(",");
+
+  const queryToFetchCorrespondingUsernamesOfAllFollowingUserIds = `
+  SELECT
+    username
+  FROM
+    user
+  WHERE
+    user_id IN (${stringOfFollowingUserIds});
+  `;
+
+  const listOfUsernameObjectsForFollowingUserIds = await twitterCloneDBConnectionObj.all(
+    queryToFetchCorrespondingUsernamesOfAllFollowingUserIds
+  );
+
+  const processedListOfUsernameObjectsForFollowingUserIds = listOfUsernameObjectsForFollowingUserIds.map(
+    (currentUsernameObj) => ({
+      user: currentUsernameObj.username,
+    })
+  );
+  res.send(processedListOfUsernameObjectsForFollowingUserIds);
 });
 
 module.exports = app;
