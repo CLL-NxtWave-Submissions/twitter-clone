@@ -37,6 +37,45 @@ const initializeDBAndServer = async () => {
 initializeDBAndServer();
 
 /*
+    Function Name : isTweetPostedByLoggedInUser
+    Function Type : Middleware
+    ----------------------------------------------------
+    Middleware function to check if the input 
+    tweet id was posted by the logged in user. Invoked
+    by another middleware: checkUserRequestAuthorization.
+    Gives control to the intended request handler
+    upon the call to "next".  
+*/
+const isTweetPostedByLoggedInUser = async (req, res, next) => {
+  const { username } = req;
+  const { tweetId } = req.params;
+
+  const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
+  const userId = loggedInUserDetails.user_id;
+
+  const queryToGetSpecificTweetDataPostedByLoggedInUser = `
+    SELECT *
+    FROM tweet
+    WHERE
+        tweet_id = ${tweetId}
+        AND
+        user_id = ${userId};
+    `;
+
+  const specificTweetDataPostedByLoggedInUser = await twitterCloneDBConnectionObj.get(
+    queryToGetSpecificTweetDataPostedByLoggedInUser
+  );
+  if (specificTweetDataPostedByLoggedInUser === undefined) {
+    res.status(401);
+    res.send("Invalid Request");
+  } else {
+    next(); // Gives control to the next middleware
+    // or handler of the intended request
+    // handler.
+  }
+};
+
+/*
     Function Name : isTweetPostedByAFollowingUser
     Function Type : Middleware
     ----------------------------------------------------
@@ -861,8 +900,28 @@ app.post("/user/tweets", checkUserRequestAuthorization, async (req, res) => {
 app.delete(
   "/tweets/:tweetId",
   checkUserRequestAuthorization,
-  isTweetPostedByAFollowingUser,
-  (req, res) => {}
+  isTweetPostedByLoggedInUser,
+  async (req, res) => {
+    const { tweetId } = req.params;
+    const { username } = req;
+
+    const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
+    const userId = loggedInUserDetails.user_id;
+
+    const queryToDeleteSpecificTweetPostedByLoggedInUser = `
+    DELETE FROM
+        tweet
+    WHERE
+        tweet_id = ${tweetId}
+        AND
+        user_id = ${userId};
+    `;
+
+    await twitterCloneDBConnectionObj.run(
+      queryToDeleteSpecificTweetPostedByLoggedInUser
+    );
+    res.send("Tweet Removed");
+  }
 );
 
 module.exports = app;
