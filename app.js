@@ -4,6 +4,7 @@ const sqlite3 = require("sqlite3");
 const path = require("path");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { format } = require("date-fns");
 
 const app = express();
 app.use(express.json());
@@ -763,6 +764,105 @@ app.get(
 
     res.send(requestedRepliesData);
   }
+);
+
+/*
+  End-Point 9  : GET /user/tweets
+  Header Name  : Authorization
+  Header Value : Bearer JSON_WEB_TOKEN
+  --------------
+  To fetch data of tweets
+  posted by the logged in
+  user, such as, tweet text,
+  number of likes, number of
+  replies and the date_time
+  it was posted.
+*/
+app.get("/user/tweets", checkUserRequestAuthorization, async (req, res) => {
+  const { username } = req;
+  const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
+  const userId = loggedInUserDetails.user_id;
+
+  const queryToGetAllTweetRelatedForLoggedInUser = `
+    SELECT
+        tweet,
+        (SELECT COUNT(*)
+         FROM like
+         WHERE like.tweet_id = tweet.tweet_id) AS likes,
+        (SELECT COUNT(*)
+         FROM reply
+         WHERE reply.tweet_id = tweet.tweet_id) AS replies,
+        date_time
+    FROM
+        tweet
+    WHERE
+        user_id = ${userId};
+    `;
+
+  const listOfAllTweetsPostedByLoggedInUser = await twitterCloneDBConnectionObj.all(
+    queryToGetAllTweetRelatedForLoggedInUser
+  );
+  const processedListOfAllTweetsPostedByLoggedInUser = listOfAllTweetsPostedByLoggedInUser.map(
+    (currentTweetData) => ({
+      tweet: currentTweetData.tweet,
+      likes: currentTweetData.likes,
+      replies: currentTweetData.replies,
+      dateTime: currentTweetData.date_time,
+    })
+  );
+
+  res.send(processedListOfAllTweetsPostedByLoggedInUser);
+});
+
+/*
+    End-Point 10 : POST /user/tweets
+    Header Name  : Authorization
+    Header Value : Bearer JSON_WEB_TOKEN
+    -------------------------------------
+    To add new tweet to the tweet table
+*/
+app.post("/user/tweets", checkUserRequestAuthorization, async (req, res) => {
+  const { username } = req;
+
+  const loggedInUserDetails = await getSpecificUserDetailsFromDB(username);
+  const userId = loggedInUserDetails.user_id;
+
+  const { tweet } = req.body;
+
+  const currentDateTime = new Date();
+  const formattedCurrentDateTime = format(
+    currentDateTime,
+    "yyyy-MM-dd HH:mm:ss"
+  );
+
+  const queryToAddNewTweetData = `
+    INSERT INTO
+        tweet (tweet, user_id, date_time)
+    VALUES
+        ('${tweet}', ${userId}, '${formattedCurrentDateTime}');
+    `;
+
+  const addNewTweetDBResponse = await twitterCloneDBConnectionObj.run(
+    queryToAddNewTweetData
+  );
+  res.send("Created a Tweet");
+});
+
+/*
+    End-Point 11 : DELETE /tweets/:tweetId
+    Header Name  : Authorization
+    Header Value : Bearer JSON_WEB_TOKEN
+    --------------
+    To delete tweet with id: tweetId, after
+    ensuring that the tweet was posted by
+    the logged in user and not by another
+    user being followed by logged in user. 
+*/
+app.delete(
+  "/tweets/:tweetId",
+  checkUserRequestAuthorization,
+  isTweetPostedByAFollowingUser,
+  (req, res) => {}
 );
 
 module.exports = app;
