@@ -869,10 +869,18 @@ app.post("/user/tweets", checkUserRequestAuthorization, async (req, res) => {
   const { tweet } = req.body;
 
   const currentDateTime = new Date();
-  const formattedCurrentDateTime = format(
-    currentDateTime,
-    "yyyy-MM-dd HH:mm:ss"
-  );
+  const currentFullYear = currentDateTime.getFullYear();
+  const currentMonth = currentDateTime.getMonth();
+  const currentDay = currentDateTime.getDate();
+  const currentHour = currentDateTime.getHours();
+  const currentMinuteCount = currentDateTime.getMinutes();
+  const currentSecondCount = currentDateTime.getSeconds();
+
+  const formattedCurrentDataTime = `${currentFullYear}-${currentMonth}-${currentDay} ${currentHour}:${currentMinuteCount}:${currentSecondCount}`;
+  //   const formattedCurrentDateTime = format(
+  //     currentDateTime,
+  //     "yyyy-MM-dd HH:mm:ss"
+  //   );
 
   const queryToAddNewTweetData = `
     INSERT INTO
