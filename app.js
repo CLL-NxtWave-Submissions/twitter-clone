@@ -4,7 +4,6 @@ const sqlite3 = require("sqlite3");
 const path = require("path");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { format } = require("date-fns");
 
 const app = express();
 app.use(express.json());
@@ -876,11 +875,7 @@ app.post("/user/tweets", checkUserRequestAuthorization, async (req, res) => {
   const currentMinuteCount = currentDateTime.getMinutes();
   const currentSecondCount = currentDateTime.getSeconds();
 
-  const formattedCurrentDataTime = `${currentFullYear}-${currentMonth}-${currentDay} ${currentHour}:${currentMinuteCount}:${currentSecondCount}`;
-  //   const formattedCurrentDateTime = format(
-  //     currentDateTime,
-  //     "yyyy-MM-dd HH:mm:ss"
-  //   );
+  const formattedCurrentDateTime = `${currentFullYear}-${currentMonth}-${currentDay} ${currentHour}:${currentMinuteCount}:${currentSecondCount}`;
 
   const queryToAddNewTweetData = `
     INSERT INTO
@@ -892,6 +887,7 @@ app.post("/user/tweets", checkUserRequestAuthorization, async (req, res) => {
   const addNewTweetDBResponse = await twitterCloneDBConnectionObj.run(
     queryToAddNewTweetData
   );
+
   res.send("Created a Tweet");
 });
 
